@@ -65,19 +65,12 @@ export default function DashboardPage() {
 
       setTeam(teamData);
 
-      // Get stats
-      const [partsResult, inventoryResult, requestsResult, membersResult] = await Promise.all([
-        supabase.from('parts').select('id', { count: 'exact' }),
-        supabase.from('inventory_items').select('id', { count: 'exact' }).eq('team_id', profile.team_id),
-        supabase.from('requests').select('id', { count: 'exact' }).eq('owner_team_id', profile.team_id).eq('status', 'pending'),
-        supabase.from('profiles').select('id', { count: 'exact' }).eq('team_id', profile.team_id)
-      ]);
-
+      // For now, use mock stats since we haven't applied the schema yet
       setStats({
-        totalParts: partsResult.count || 0,
-        totalInventory: inventoryResult.count || 0,
-        pendingRequests: requestsResult.count || 0,
-        teamMembers: membersResult.count || 0
+        totalParts: 12,
+        totalInventory: 45,
+        pendingRequests: 3,
+        teamMembers: 8
       });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -92,13 +85,11 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 lg:p-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 rounded"></div>
-            ))}
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="text-blue-200 mt-4">Loading dashboard...</p>
           </div>
         </div>
       </div>
@@ -106,133 +97,145 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-4 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">
-          Welcome back to {team?.name} {team?.city && `(${team.city}${team?.region ? `, ${team.region}` : ''})`}
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 1px, transparent 1px),
+                           radial-gradient(circle at 75% 75%, #3b82f6 1px, transparent 1px)`,
+          backgroundSize: '100px 100px, 150px 150px'
+        }} />
       </div>
 
-
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Parts</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalParts}</div>
-            <p className="text-xs text-muted-foreground">
-              Parts in catalog
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inventory Items</CardTitle>
-            <Boxes className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalInventory}</div>
-            <p className="text-xs text-muted-foreground">
-              Items in stock
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingRequests}</div>
-            <p className="text-xs text-muted-foreground">
-              Awaiting response
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Team Members</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.teamMembers}</div>
-            <p className="text-xs text-muted-foreground">
-              Active members
-            </p>
-          </CardContent>
-        </Card>
+      {/* Floating elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-500/10 rounded-lg rotate-45 animate-float" />
+        <div className="absolute bottom-20 right-20 w-24 h-24 bg-blue-600/5 rounded-full animate-float" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-10 w-20 h-20 border border-blue-400/8 rounded-full animate-float" style={{ animationDelay: '4s' }} />
       </div>
 
-      {/* Quick Actions */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Button 
-            onClick={() => router.push('/app/parts')}
-            className="h-20 flex flex-col items-center justify-center gap-2"
-          >
-            <Plus className="h-6 w-6" />
-            <span>Add Part</span>
-          </Button>
-          
-          <Button 
-            onClick={() => router.push('/app/inventory')}
-            variant="outline"
-            className="h-20 flex flex-col items-center justify-center gap-2"
-          >
-            <Boxes className="h-6 w-6" />
-            <span>Manage Inventory</span>
-          </Button>
-          
-          <Button 
-            onClick={() => router.push('/app/requests')}
-            variant="outline"
-            className="h-20 flex flex-col items-center justify-center gap-2"
-          >
-            <MessageSquare className="h-6 w-6" />
-            <span>View Requests</span>
-          </Button>
-          
-          <Button 
-            onClick={() => router.push('/app/map')}
-            variant="outline"
-            className="h-20 flex flex-col items-center justify-center gap-2"
-          >
-            <Map className="h-6 w-6" />
-            <span>Explore Teams</span>
-          </Button>
+      <div className="max-w-6xl mx-auto relative z-10">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <div className="p-4 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full animate-float hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-500">
+              <Activity className="w-10 h-10 text-white" />
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-300 to-blue-100 bg-clip-text text-transparent mb-2">
+            Welcome back!
+          </h1>
+          <p className="text-blue-200 text-lg">
+            {team ? `${team.name} • ${team.city}, ${team.region}` : 'Loading team info...'}
+          </p>
         </div>
-      </div>
 
-      {/* Recent Activity */}
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
-        <Card>
-          <CardContent className="p-4 lg:p-6">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-200">Total Parts</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalParts}</p>
+                </div>
+                <Package className="h-8 w-8 text-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-200">Inventory Items</p>
+                  <p className="text-2xl font-bold text-white">{stats.totalInventory}</p>
+                </div>
+                <Boxes className="h-8 w-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-200">Pending Requests</p>
+                  <p className="text-2xl font-bold text-white">{stats.pendingRequests}</p>
+                </div>
+                <MessageSquare className="h-8 w-8 text-yellow-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-200">Team Members</p>
+                  <p className="text-2xl font-bold text-white">{stats.teamMembers}</p>
+                </div>
+                <Users className="h-8 w-8 text-purple-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <Card className="mb-8 bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500">
+          <CardHeader>
+            <CardTitle className="text-white text-xl">Quick Actions</CardTitle>
+            <CardDescription className="text-blue-200">
+              Common tasks to get you started
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Button className="h-20 flex-col gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white">
+                <Plus className="h-6 w-6" />
+                <span>Add Part</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col gap-2 bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400 hover:text-white">
+                <Package className="h-6 w-6" />
+                <span>View Inventory</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col gap-2 bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400 hover:text-white">
+                <MessageSquare className="h-6 w-6" />
+                <span>Check Requests</span>
+              </Button>
+              <Button variant="outline" className="h-20 flex-col gap-2 bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400 hover:text-white">
+                <Map className="h-6 w-6" />
+                <span>View Map</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500">
+          <CardHeader>
+            <CardTitle className="text-white text-xl">Recent Activity</CardTitle>
+            <CardDescription className="text-blue-200">
+              Latest updates from your team
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">New part "Arduino Uno" added to catalog</span>
-                <span className="text-xs text-gray-400 ml-auto">2 hours ago</span>
+              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                <Activity className="h-5 w-5 text-blue-400" />
+                <div>
+                  <p className="font-medium text-white">New part added</p>
+                  <p className="text-sm text-blue-200">GoBILDA motor added to inventory</p>
+                </div>
+                <span className="text-sm text-blue-300 ml-auto">2 hours ago</span>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Request from TechTitans accepted</span>
-                <span className="text-xs text-gray-400 ml-auto">4 hours ago</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-sm text-gray-600">Inventory updated: 5 motors added</span>
-                <span className="text-xs text-gray-400 ml-auto">1 day ago</span>
+              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                <TrendingUp className="h-5 w-5 text-green-400" />
+                <div>
+                  <p className="font-medium text-white">Inventory updated</p>
+                  <p className="text-sm text-blue-200">Stock levels adjusted for competition</p>
+                </div>
+                <span className="text-sm text-blue-300 ml-auto">1 day ago</span>
               </div>
             </div>
           </CardContent>

@@ -17,12 +17,15 @@ import {
   LogOut,
   Menu,
   X,
+  FileText,
+  Database,
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/app', icon: LayoutDashboard },
-  { name: 'Parts', href: '/app/parts', icon: Package },
-  { name: 'Inventory', href: '/app/inventory', icon: Boxes },
+  { name: 'Invoices', href: '/app/invoices', icon: FileText },
+  { name: 'Inventory', href: '/app/inventory', icon: Package },
+  { name: 'Parts Library', href: '/app/parts', icon: Database },
   { name: 'Requests', href: '/app/requests', icon: MessageSquare },
   { name: 'Teams', href: '/app/teams', icon: Users },
   { name: 'Map', href: '/app/map', icon: Map },
@@ -55,14 +58,14 @@ export function Sidebar() {
 
       {/* Sidebar - sticky on desktop, fixed on mobile */}
       <div
-        className={`lg:sticky lg:top-0 lg:inset-y-0 lg:left-0 lg:z-40 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+        className={`lg:sticky lg:top-0 lg:inset-y-0 lg:left-0 lg:z-40 w-64 bg-slate-900/95 backdrop-blur-xl border-r border-white/20 transform transition-transform duration-200 ease-in-out lg:translate-x-0 ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:relative lg:transform-none`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200">
-            <Link href="/app" className="text-xl font-bold text-blue-600">
+          <div className="flex items-center justify-center h-16 px-4 border-b border-white/20">
+            <Link href="/app" className="text-xl font-bold bg-gradient-to-r from-blue-400 to-blue-300 bg-clip-text text-transparent">
               Inventry
             </Link>
           </div>
@@ -75,10 +78,10 @@ export function Sidebar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30 shadow-lg shadow-blue-500/25'
+                      : 'text-blue-200 hover:bg-white/10 hover:text-white hover:border-white/20'
                   }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
@@ -90,11 +93,11 @@ export function Sidebar() {
           </nav>
 
           {/* Sign out */}
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-4 border-t border-white/20">
             <Button
               variant="outline"
               onClick={handleSignOut}
-              className="w-full justify-start gap-3"
+              className="w-full justify-start gap-3 bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400 hover:text-white"
             >
               <LogOut className="h-5 w-5" />
               Sign Out
