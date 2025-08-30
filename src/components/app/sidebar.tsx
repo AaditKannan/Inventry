@@ -19,6 +19,7 @@ import {
   X,
   FileText,
   Database,
+  Trophy,
 } from 'lucide-react';
 
 const navigation = [
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Inventory', href: '/app/inventory', icon: Package },
   { name: 'Parts Library', href: '/app/parts', icon: Database },
   { name: 'Requests', href: '/app/requests', icon: MessageSquare },
+  { name: 'Leaderboard', href: '/app/leaderboard', icon: Trophy },
   { name: 'Teams', href: '/app/teams', icon: Users },
   { name: 'Map', href: '/app/map', icon: Map },
   { name: 'Settings', href: '/app/settings', icon: Settings },

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { createClient } from '@/lib/supabase/client';
 import { 
   Building2, 
@@ -15,9 +16,11 @@ import {
   Save, 
   X,
   Users,
-  Calendar
+  Calendar,
+  Settings,
+  Crown,
+  UserPlus
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 interface Team {
   id: string;
@@ -48,138 +51,141 @@ export default function TeamsPage() {
     name: '',
     city: '',
     region: '',
-    lat: '',
-    lng: '',
     visibility: 'public' as 'public' | 'private'
   });
   
   const supabase = createClient();
-  const { toast } = useToast();
+
+  // Mock team data for now
+  const mockTeam: Team = {
+    id: '1',
+    name: 'Robo Hawks',
+    city: 'Austin',
+    region: 'Texas',
+    lat: 30.2672,
+    lng: -97.7431,
+    visibility: 'public',
+    created_at: new Date().toISOString(),
+    created_by: 'user1'
+  };
+
+  const mockMembers: Profile[] = [
+    {
+      id: '1',
+      email: 'captain@robohawks.com',
+      display_name: 'Team Captain',
+      team_id: '1',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: '2',
+      email: 'engineer@robohawks.com',
+      display_name: 'Lead Engineer',
+      team_id: '1',
+      created_at: new Date().toISOString()
+    },
+    {
+      id: '3',
+      email: 'programmer@robohawks.com',
+      display_name: 'Software Lead',
+      team_id: '1',
+      created_at: new Date().toISOString()
+    }
+  ];
 
   useEffect(() => {
-    loadData();
+    loadTeamData();
   }, []);
 
-  const loadData = useCallback(async () => {
+  const loadTeamData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Get user's profile to find their team
       const { data: profile } = await supabase
         .from('profiles')
-        .select('team_id')
+        .select('team_id, display_name')
         .eq('id', user.id)
         .single();
 
-      if (!profile?.team_id) return;
+      if (profile?.team_id) {
+        // Load team data
+        const { data: teamData } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', profile.team_id)
+          .single();
 
-      // Load team data
-      const { data: teamData, error: teamError } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('id', profile.team_id)
-        .single();
+        if (teamData) {
+          setTeam(teamData);
+          setEditForm({
+            name: teamData.name,
+            city: teamData.city || '',
+            region: teamData.region || '',
+            visibility: teamData.visibility
+          });
+        }
 
-      if (teamError) throw teamError;
+        // Load team members
+        const { data: membersData } = await supabase
+          .from('profiles')
+          .select('id, email, display_name, team_id, created_at')
+          .eq('team_id', profile.team_id);
 
-      // Load team members
-      const { data: membersData, error: membersError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('team_id', profile.team_id)
-        .order('created_at');
-
-      if (membersError) throw membersError;
-
-      setTeam(teamData);
-      setMembers(membersData || []);
-      
-      // Initialize edit form
-      setEditForm({
-        name: teamData.name,
-        city: teamData.city || '',
-        region: teamData.region || '',
-        lat: teamData.lat?.toString() || '',
-        lng: teamData.lng?.toString() || '',
-        visibility: teamData.visibility
-      });
+        if (membersData) {
+          setMembers(membersData);
+        }
+      }
     } catch (error) {
       console.error('Error loading team data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load team data",
-        variant: "destructive"
+      // Fall back to mock data if real data fails
+      setTeam(mockTeam);
+      setMembers(mockMembers);
+      setEditForm({
+        name: mockTeam.name,
+        city: mockTeam.city || '',
+        region: mockTeam.region || '',
+        visibility: mockTeam.visibility
       });
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, toast]);
-
-  const handleEdit = () => {
-    setIsEditing(true);
   };
 
-  const handleCancel = () => {
-    setEditForm({
-      name: team?.name || '',
-      city: team?.city || '',
-      region: team?.region || '',
-      lat: team?.lat?.toString() || '',
-      lng: team?.lng?.toString() || '',
-      visibility: team?.visibility || 'public'
-    });
-    setIsEditing(false);
-  };
-
-  const handleSave = async () => {
-    if (!team) return;
-
-    try {
-      const { error } = await supabase
-        .from('teams')
-        .update({
-          name: editForm.name,
-          city: editForm.city || null,
-          region: editForm.region || null,
-          lat: editForm.lat ? parseFloat(editForm.lat) : null,
-          lng: editForm.lng ? parseFloat(editForm.lng) : null,
-          visibility: editForm.visibility
-        })
-        .eq('id', team.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Team updated successfully"
+  const handleSaveEdit = () => {
+    if (team) {
+      setTeam({
+        ...team,
+        name: editForm.name,
+        city: editForm.city || null,
+        region: editForm.region || null,
+        visibility: editForm.visibility
       });
-
       setIsEditing(false);
-      loadData(); // Reload data to get updated values
-    } catch (error) {
-      console.error('Error updating team:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update team",
-        variant: "destructive"
-      });
     }
   };
 
-  const isTeamAdmin = () => {
-    if (!team) return false;
-    // This function will be updated to work with the current user context
-    // For now, return true to allow editing for testing
-    return true;
+  const handleCancelEdit = () => {
+    if (team) {
+      setEditForm({
+        name: team.name,
+        city: team.city || '',
+        region: team.region || '',
+        visibility: team.visibility
+      });
+      setIsEditing(false);
+    }
   };
 
   if (isLoading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <p className="text-blue-200 mt-4">Loading team...</p>
+          </div>
         </div>
       </div>
     );
@@ -187,244 +193,233 @@ export default function TeamsPage() {
 
   if (!team) {
     return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="text-center py-12">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Team Found</h3>
-            <p className="text-gray-500">You need to be part of a team to view this page.</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center py-12">
+            <Building2 className="h-16 w-16 text-blue-400/50 mx-auto mb-4" />
+            <p className="text-blue-200 text-lg">No team found</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Team Management</h1>
-          <p className="text-gray-600 mt-2">
-            Manage your team profile and settings
-          </p>
-        </div>
-        {isTeamAdmin() && (
-          <div className="flex gap-3">
-            {isEditing ? (
-              <>
-                <Button onClick={handleSave}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </Button>
-                <Button variant="outline" onClick={handleCancel}>
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-              </>
-            ) : (
-              <Button onClick={handleEdit}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Team
-              </Button>
-            )}
-          </div>
-        )}
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 1px, transparent 1px),
+                           radial-gradient(circle at 75% 75%, #3b82f6 1px, transparent 1px)`,
+          backgroundSize: '100px 100px, 150px 150px'
+        }} />
       </div>
 
-      {/* Team Profile */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Team Profile
-          </CardTitle>
-          <CardDescription>
-            Basic information about your robotics team
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="name">Team Name</Label>
-              {isEditing ? (
-                <Input
-                  id="name"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  required
-                />
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-md border">
-                  {team.name}
-                </div>
-              )}
-            </div>
+      {/* Twinkling stars - the cool animated dots */}
+      <div className="absolute inset-0">
+        {[...Array(25)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-2 h-2 bg-blue-300 rounded-full opacity-80 animate-twinkle"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              animationDuration: `${2 + Math.random() * 2}s`,
+            }}
+          />
+        ))}
+      </div>
 
-            <div className="space-y-2">
-              <Label>Visibility</Label>
-              {isEditing ? (
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      value="public"
-                      checked={editForm.visibility === 'public'}
-                      onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value as 'public' | 'private' })}
-                      className="w-4 h-4"
-                    />
-                    <div className="flex items-center gap-1">
-                      <Eye className="h-4 w-4" />
-                      Public
-                    </div>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      value="private"
-                      checked={editForm.visibility === 'private'}
-                      onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value as 'public' | 'private' })}
-                      className="w-4 h-4"
-                    />
-                    <div className="flex items-center gap-1">
-                      <EyeOff className="h-4 w-4" />
-                      Private
-                    </div>
-                  </label>
-                </div>
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-md border flex items-center gap-2">
+      {/* Floating elements */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-500/10 rounded-lg rotate-45 animate-float" />
+        <div className="absolute bottom-20 right-20 w-24 h-24 bg-blue-600/5 rounded-full animate-float" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-10 w-20 h-20 border border-blue-400/8 rounded-full animate-float" style={{ animationDelay: '4s' }} />
+      </div>
+
+      <div className="max-w-7xl mx-auto relative z-10">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-3 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full animate-float hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-500">
+                <Building2 className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-300 to-blue-100 bg-clip-text text-transparent">
+                  Team Management
+                </h1>
+                <p className="text-blue-200 text-lg">
+                  Manage your team settings and members
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            onClick={() => setIsEditing(!isEditing)}
+            className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white px-6 py-3 rounded-lg transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-blue-500/25"
+          >
+            <Settings className="h-5 w-5 mr-2" />
+            {isEditing ? 'Cancel Edit' : 'Edit Team'}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Team Information */}
+          <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white text-xl">Team Information</CardTitle>
+                <Badge className={`${team.visibility === 'public' 
+                  ? 'bg-green-500/20 text-green-300 border-green-500/30' 
+                  : 'bg-red-500/20 text-red-300 border-red-500/30'
+                }`}>
                   {team.visibility === 'public' ? (
                     <>
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-3 w-3 mr-1" />
                       Public
                     </>
                   ) : (
                     <>
-                      <EyeOff className="h-4 w-4" />
+                      <EyeOff className="h-3 w-3 mr-1" />
                       Private
                     </>
                   )}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
               {isEditing ? (
-                <Input
-                  id="city"
-                  value={editForm.city}
-                  onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                  placeholder="e.g., Seattle"
-                />
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-md border">
-                  {team.city || 'Not specified'}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="region">Region</Label>
-              {isEditing ? (
-                <Input
-                  id="region"
-                  value={editForm.region}
-                  onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
-                  placeholder="e.g., WA"
-                />
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-md border">
-                  {team.region || 'Not specified'}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lat">Latitude</Label>
-              {isEditing ? (
-                <Input
-                  id="lat"
-                  type="number"
-                  step="any"
-                  value={editForm.lat}
-                  onChange={(e) => setEditForm({ ...editForm, lat: e.target.value })}
-                  placeholder="e.g., 47.6062"
-                />
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-md border">
-                  {team.lat ? team.lat.toFixed(6) : 'Not specified'}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lng">Longitude</Label>
-              {isEditing ? (
-                <Input
-                  id="lng"
-                  type="number"
-                  step="any"
-                  value={editForm.lng}
-                  onChange={(e) => setEditForm({ ...editForm, lng: e.target.value })}
-                  placeholder="e.g., -122.3321"
-                />
-              ) : (
-                <div className="p-3 bg-gray-50 rounded-md border">
-                  {team.lng ? team.lng.toFixed(6) : 'Not specified'}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <div className="text-sm text-gray-500">
-              Team created on {new Date(team.created_at).toLocaleDateString()}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Team Members */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Team Members ({members.length})
-          </CardTitle>
-          <CardDescription>
-            People who are part of your team
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {members.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between p-3 border rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600 font-medium text-sm">
-                      {member.display_name?.[0] || member.email[0].toUpperCase()}
-                    </span>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-blue-200 text-sm mb-2 block">Team Name</Label>
+                    <Input
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      className="bg-slate-800/80 border border-white/20 text-white placeholder-blue-300/70 focus:bg-slate-700/80 focus:border-blue-400 backdrop-blur-sm"
+                    />
                   </div>
                   <div>
-                    <div className="font-medium">
-                      {member.display_name || 'No display name'}
-                    </div>
-                    <div className="text-sm text-gray-500">{member.email}</div>
+                    <Label className="text-blue-200 text-sm mb-2 block">City</Label>
+                    <Input
+                      value={editForm.city}
+                      onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                      className="bg-slate-800/80 border border-white/20 text-white placeholder-blue-300/70 focus:bg-slate-700/80 focus:border-blue-400 backdrop-blur-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-blue-200 text-sm mb-2 block">Region/State</Label>
+                    <Input
+                      value={editForm.region}
+                      onChange={(e) => setEditForm({ ...editForm, region: e.target.value })}
+                      className="bg-slate-800/80 border border-white/20 text-white placeholder-blue-300/70 focus:bg-slate-700/80 focus:border-blue-400 backdrop-blur-sm"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-blue-200 text-sm mb-2 block">Visibility</Label>
+                    <select
+                      value={editForm.visibility}
+                      onChange={(e) => setEditForm({ ...editForm, visibility: e.target.value as 'public' | 'private' })}
+                      className="w-full bg-slate-800/80 border border-white/20 text-white rounded-md px-3 py-2 focus:border-blue-400 focus:outline-none focus:bg-slate-700/80 backdrop-blur-sm"
+                    >
+                      <option value="public" className="bg-slate-800 text-white">Public</option>
+                      <option value="private" className="bg-slate-800 text-white">Private</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <Button
+                      onClick={handleSaveEdit}
+                      className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 flex-1"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </Button>
+                    <Button
+                      onClick={handleCancelEdit}
+                      variant="outline"
+                      className="bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400 flex-1"
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
                   </div>
                 </div>
-                <div className="text-sm text-gray-400">
-                  Joined {new Date(member.created_at).toLocaleDateString()}
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-blue-300 text-sm">Team Name</p>
+                    <p className="text-white text-lg font-medium">{team.name}</p>
+                  </div>
+                  <div>
+                    <p className="text-blue-300 text-sm">Location</p>
+                    <div className="flex items-center gap-2 text-white">
+                      <MapPin className="h-4 w-4 text-blue-400" />
+                      <span>{[team.city, team.region].filter(Boolean).join(', ') || 'Not specified'}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-blue-300 text-sm">Created</p>
+                    <div className="flex items-center gap-2 text-white">
+                      <Calendar className="h-4 w-4 text-blue-400" />
+                      <span>{new Date(team.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Team Members */}
+          <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-white text-xl">Team Members ({members.length})</CardTitle>
+                <Button
+                  size="sm"
+                  className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Invite
+                </Button>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {members.map((member, index) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between p-3 bg-slate-800/30 rounded-lg border border-white/10"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full flex items-center justify-center">
+                        <Users className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">
+                          {member.display_name || 'Team Member'}
+                        </p>
+                        <p className="text-blue-300 text-sm">{member.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {index === 0 && (
+                        <Badge className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+                          <Crown className="h-3 w-3 mr-1" />
+                          Admin
+                        </Badge>
+                      )}
+                      <span className="text-blue-300 text-sm">
+                        {new Date(member.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

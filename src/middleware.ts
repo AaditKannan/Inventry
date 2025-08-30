@@ -70,10 +70,14 @@ export async function middleware(request: NextRequest) {
         .eq('id', user.id)
         .single();
 
+      console.log('Middleware profile check:', { profile, path: request.nextUrl.pathname });
+
       if (!profile?.display_name || !profile?.team_id) {
+        console.log('Redirecting to onboarding - missing profile data');
         return NextResponse.redirect(new URL('/onboarding', request.url));
       }
     } catch (error) {
+      console.log('Redirecting to onboarding - profile error:', error);
       // If profile doesn't exist, redirect to onboarding
       return NextResponse.redirect(new URL('/onboarding', request.url));
     }

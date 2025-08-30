@@ -25,6 +25,7 @@ export default function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Create team form state
+  const [teamNumber, setTeamNumber] = useState('');
   const [teamName, setTeamName] = useState('');
   const [city, setCity] = useState('');
   const [region, setRegion] = useState('');
@@ -36,6 +37,8 @@ export default function OnboardingPage() {
   
   const supabase = createClient();
   const router = useRouter();
+
+
 
   const loadPublicTeams = useCallback(async () => {
     try {
@@ -135,6 +138,13 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
 
     try {
+      // Validate required fields
+      if (!teamName.trim()) {
+        alert('Please enter your team name');
+        setIsSubmitting(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/login');
@@ -159,14 +169,21 @@ export default function OnboardingPage() {
       }
 
       // Update user profile with team_id
-      const { error: profileError } = await supabase
+      console.log('Updating profile with:', { team_id: team.id, display_name: displayName || teamName, user_id: user.id });
+      
+      const { data: updatedProfile, error: profileError } = await supabase
         .from('profiles')
         .update({ team_id: team.id, display_name: displayName || teamName })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select()
+        .single();
 
       if (profileError) {
+        console.error('Profile update error:', profileError);
         throw profileError;
       }
+      
+      console.log('Profile updated successfully:', updatedProfile);
 
       // Create default location for the team
       await supabase
@@ -181,23 +198,11 @@ export default function OnboardingPage() {
       console.log('Team created successfully, redirecting to /app...');
       console.log('Profile updated with:', { team_id: team.id, display_name: displayName || teamName });
       
-      // Try multiple redirect approaches
-      try {
-        // First try router.push
-        router.push('/app');
-        
-        // If that doesn't work after a short delay, try window.location
-        setTimeout(() => {
-          if (window.location.pathname !== '/app') {
-            console.log('Router push failed, trying window.location...');
-            window.location.href = '/app';
-          }
-        }, 1000);
-      } catch (error) {
-        console.error('Redirect error:', error);
-        // Fallback to window.location
-        window.location.href = '/app';
-      }
+      // Wait a bit for the database to commit the changes
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force a hard redirect to ensure middleware sees the updated profile
+      window.location.href = '/app';
     } catch (error) {
       console.error('Error creating team:', error);
       alert('Failed to create team. Please try again.');
@@ -341,14 +346,29 @@ export default function OnboardingPage() {
             <CardHeader className="text-center">
               <CardTitle className="flex items-center justify-center gap-2 text-white">
                 <Building2 className="h-6 w-6 text-blue-400" />
-                Create New Team
+                Create Your Team
               </CardTitle>
               <CardDescription className="text-blue-200">
-                Start a new robotics team and invite others to join
+                Create your robotics team on Inventry and start managing your inventory
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateTeam} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="teamNumber" className="text-blue-200 font-medium">Team Number</Label>
+                  <div className="relative group">
+                    <Input
+                      id="teamNumber"
+                      value={teamNumber}
+                      onChange={(e) => setTeamNumber(e.target.value)}
+                      placeholder="e.g., 12345 (optional)"
+                      className="w-full bg-white/10 border-white/20 text-white placeholder-blue-300/50 focus:bg-white/20 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-300 group-hover:bg-white/15 group-hover:border-blue-300/40 input-hover-glow"
+                    />
+                    <div className="absolute inset-0 rounded-md bg-gradient-to-r from-blue-500/20 to-blue-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+                    <div className="absolute inset-0 rounded-md border-2 border-blue-400/0 group-hover:border-blue-400/40 transition-all duration-300 pointer-events-none"></div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="teamName" className="text-blue-200 font-medium">Team Name *</Label>
                   <div className="relative group">
