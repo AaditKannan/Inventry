@@ -222,6 +222,9 @@ CREATE POLICY "Users can view own profile" ON profiles
 CREATE POLICY "Users can update own profile" ON profiles
     FOR UPDATE USING (auth.uid() = id);
 
+CREATE POLICY "Users can insert own profile" ON profiles
+    FOR INSERT WITH CHECK (auth.uid() = id);
+
 -- Teams: public teams visible to all, team members can manage their team
 CREATE POLICY "Public teams are visible to all" ON teams
     FOR SELECT USING (visibility = 'public');

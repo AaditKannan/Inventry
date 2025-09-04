@@ -6,16 +6,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
-import { Github, Zap, Shield, Package } from 'lucide-react';
+import { isEducationalEmail, getEmailDomainType } from '@/lib/email-verification';
+import { Github, Zap, Shield, Package, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import StarryBackground from '@/components/ui/starry-background';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('');
+  const [emailValidation, setEmailValidation] = useState<{
+    isValid: boolean;
+    isEducational: boolean;
+    organizationType: string;
+  } | null>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  const validateEmail = (emailInput: string) => {
+    const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput);
+    const isEducational = isEducationalEmail(emailInput);
+    const organizationType = getEmailDomainType(emailInput);
+    
+    setEmailValidation({
+      isValid,
+      isEducational,
+      organizationType
+    });
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setEmail(newEmail);
+    if (newEmail.length > 0) {
+      validateEmail(newEmail);
+    } else {
+      setEmailValidation(null);
+    }
+  };
 
   const handleMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,11 +52,30 @@ export default function LoginPage() {
     setMessage('');
     setMessageType('');
 
+    // Enhanced validation for child safety
+    if (!emailValidation?.isValid) {
+      setMessage('Please enter a valid email address.');
+      setMessageType('error');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!emailValidation.isEducational) {
+      setMessage('⚠️ For child safety, Inventry requires an educational institution email (.edu, .k12, or school domain). Contact support@inventry.app if you need assistance.');
+      setMessageType('error');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            organization_type: emailValidation.organizationType,
+            email_verification_level: emailValidation.isEducational ? 'educational' : 'standard'
+          }
         },
       });
 
@@ -35,7 +83,7 @@ export default function LoginPage() {
         setMessage(error.message);
         setMessageType('error');
       } else {
-        setMessage('✨ Magic link sent! Check your email for the secure login link.');
+        setMessage('✨ Secure verification email sent! Check your institutional email for the login link.');
         setMessageType('success');
       }
     } catch (error) {
@@ -69,38 +117,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Subtle background pattern - static, no performance impact - same as home page */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 1px, transparent 1px),
-                           radial-gradient(circle at 75% 75%, #3b82f6 1px, transparent 1px)`,
-          backgroundSize: '100px 100px, 150px 150px'
-        }} />
-      </div>
-
-      {/* Large, bright stars that move on their own - no mouse interaction */}
-      <div className="absolute inset-0">
-        {[...Array(25)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-2 h-2 bg-blue-300 rounded-full opacity-80 animate-twinkle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Floating geometric shapes - smooth movement - same as home page */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-500/10 rounded-lg rotate-45 animate-float" />
-        <div className="absolute bottom-20 right-20 w-24 h-24 bg-blue-600/5 rounded-full animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-10 w-20 h-20 border border-blue-400/8 rounded-full animate-float" style={{ animationDelay: '4s' }} />
-      </div>
+    <StarryBackground className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4"
+      starCount={25}>
 
       <Card className="w-full max-w-md bg-white/5 backdrop-blur-xl border-white/10 shadow-2xl relative z-10 hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 group">
         <CardHeader className="text-center space-y-4">
@@ -127,15 +145,35 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="student@university.edu"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleEmailChange}
                   required
                   className="w-full bg-white/10 border-white/20 text-white placeholder-blue-300/50 focus:bg-white/20 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all duration-300 group-hover:bg-white/15 group-hover:border-blue-300/40 hover:shadow-lg hover:shadow-blue-500/20 hover:shadow-2xl hover:shadow-blue-500/40"
                 />
                 <div className="absolute inset-0 rounded-md bg-gradient-to-r from-blue-500/20 to-blue-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
                 <div className="absolute inset-0 rounded-md border-2 border-blue-400/0 group-hover:border-blue-400/40 transition-all duration-300 pointer-events-none"></div>
               </div>
+              {emailValidation && (
+                <div className="mt-2 text-sm">
+                  {emailValidation.isEducational ? (
+                    <div className="flex items-center gap-2 text-green-300">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>✅ {emailValidation.organizationType} - Verified Educational Email</span>
+                    </div>
+                  ) : emailValidation.isValid ? (
+                    <div className="flex items-center gap-2 text-yellow-300">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>⚠️ Educational email required for child safety</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-red-300">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>❌ Please enter a valid email address</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             <Button 
@@ -209,6 +247,47 @@ export default function LoginPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+
+      {/* Security Information */}
+      <Card className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl max-w-md mx-auto mt-6">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Shield className="h-6 w-6 text-blue-400" />
+            <CardTitle className="text-white text-lg">🛡️ Child Safety & Security</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-blue-200">
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+              <span><strong>Educational Email Required:</strong> Only .edu, .k12, and verified school domains allowed</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+              <span><strong>Multi-Factor Authentication:</strong> Email + optional GitHub verification</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+              <span><strong>Team-Based Access:</strong> All accounts are supervised within educational teams</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+              <span><strong>Privacy Protection:</strong> No personal data sharing outside your team</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+              <span><strong>Secure Communications:</strong> All interactions are logged and monitored</span>
+            </div>
+          </div>
+          
+          <div className="pt-3 border-t border-white/10">
+            <p className="text-xs text-blue-300">
+              Need help? Contact <a href="mailto:support@inventry.app" className="text-blue-400 hover:text-blue-300 underline">support@inventry.app</a> or read our 
+              <a href="/safety" className="text-blue-400 hover:text-blue-300 underline ml-1">Child Safety Guidelines</a>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </StarryBackground>
   );
 }

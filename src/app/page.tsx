@@ -2,27 +2,12 @@
 
 import Link from "next/link";
 import { Package, Rocket, Users, Zap } from 'lucide-react';
+import StarryBackground from '@/components/ui/starry-background';
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden flex items-center justify-center">
-      {/* Subtle background pattern - static, no performance impact */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 1px, transparent 1px),
-                           radial-gradient(circle at 75% 75%, #3b82f6 1px, transparent 1px)`,
-          backgroundSize: '100px 100px, 150px 150px'
-        }} />
-      </div>
-
-      {/* Subtle floating elements - minimal animation */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-500/10 rounded-lg rotate-45 animate-float" />
-        <div className="absolute bottom-20 right-20 w-24 h-24 bg-blue-600/5 rounded-full animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-10 w-20 h-20 border border-blue-400/8 rounded-full animate-float" style={{ animationDelay: '4s' }} />
-      </div>
-
-      <div className="text-center space-y-8 p-8 relative z-10 max-w-6xl mx-auto">
+    <StarryBackground className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
+      <div className="text-center space-y-8 p-8 max-w-6xl mx-auto">
         <div className="space-y-6">
           <div className="flex justify-center mb-6">
             <div className="p-6 bg-gradient-to-r from-blue-600 to-blue-500 rounded-full animate-float hover:shadow-lg hover:shadow-blue-500/25 hover:shadow-2xl hover:shadow-blue-500/40 transition-all duration-500 hover:scale-110">
@@ -84,6 +69,6 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-    </div>
+    </StarryBackground>
   );
 }

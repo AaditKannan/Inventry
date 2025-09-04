@@ -154,6 +154,7 @@ function extractLineItems(text: string, vendor: string): ParsedInvoiceItem[] {
   console.log(`🔍 Extracting line items for ${vendor}...`);
   console.log(`📄 Processing ${lines.length} lines from OCR/PDF text`);
   
+  // First pass: look for structured line items
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line || line.length < 5) continue;
@@ -215,6 +216,16 @@ function extractLineItemsAggressive(text: string, vendor: string): ParsedInvoice
   
   console.log('🎯 Starting aggressive parsing - looking for product lines...');
   
+  // Try vendor-specific parsing first
+  if (vendor.toLowerCase().includes('gobilda')) {
+    const gobildaItems = parseGoBILDAInvoice(text);
+    if (gobildaItems.length > 0) {
+      console.log(`🎯 GoBILDA-specific parsing found ${gobildaItems.length} items`);
+      return gobildaItems;
+    }
+  }
+  
+  // Fall back to generic aggressive parsing
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.length < 10) continue;
@@ -258,8 +269,411 @@ function extractLineItemsAggressive(text: string, vendor: string): ParsedInvoice
     }
   }
   
-  console.log(`🎯 Aggressive parsing found ${items.length} items`);
+  console.log(`🎯 Generic aggressive parsing found ${items.length} items`);
   return items.slice(0, 10); // Limit to 10 items to avoid noise
+}
+
+function parseGoBILDAInvoice(text: string): ParsedInvoiceItem[] {
+  console.log('🚨 EMERGENCY PARSER - DEBUGGING MODE');
+  console.log('📄 RAW OCR TEXT:');
+  console.log('=====================================');
+  console.log(text);
+  console.log('=====================================');
+  
+  const lines = text.split('\n');
+  console.log(`📊 TOTAL LINES: ${lines.length}`);
+  
+  console.log('🔍 ALL LINES ANALYSIS:');
+  lines.forEach((line, index) => {
+    if (line.trim().length > 0) {
+      console.log(`Line ${index + 1}: "${line.trim()}"`);
+    }
+  });
+  
+  // Look for actual GoBILDA invoice patterns based on your image
+  const items: ParsedInvoiceItem[] = [];
+  
+  // Pattern 1: Look for lines that start with quantity and contain GoBILDA SKU
+  const productLinePattern = /^(\d+)\s+(\d{4}-\d{4}-\d{4})\s+(.+?)\s+\$?(\d+\.?\d*)\s+\$?(\d+\.?\d*)$/;
+  
+  console.log('🎯 LOOKING FOR PRODUCT LINES WITH PATTERN: Qty SKU Description UnitPrice TotalPrice');
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Skip empty lines and obvious non-product lines
+    if (line.length < 10) continue;
+    if (/^(order|invoice|date|customer|ship|bill|payment|subtotal|tax|total|grand)/i.test(line)) continue;
+    
+    console.log(`\n🔍 TESTING LINE ${i + 1}: "${line}"`);
+    
+    const match = line.match(productLinePattern);
+    if (match) {
+      const [, qtyStr, sku, description, unitPriceStr, totalPriceStr] = match;
+      
+      const quantity = parseInt(qtyStr);
+      const unitPrice = parseFloat(unitPriceStr);
+      const totalPrice = parseFloat(totalPriceStr);
+      
+      console.log(`✅ PERFECT MATCH FOUND:`);
+      console.log(`   Quantity: ${quantity}`);
+      console.log(`   SKU: ${sku}`);
+      console.log(`   Description: "${description}"`);
+      console.log(`   Unit Price: $${unitPrice}`);
+      console.log(`   Total Price: $${totalPrice}`);
+      
+      items.push({
+        description: description.trim(),
+        quantity,
+        price: unitPrice,
+        total: totalPrice,
+        sku,
+        manufacturer: 'GoBILDA',
+        confidence: 0.99
+      });
+      continue;
+    }
+    
+    // Pattern 2: Look for any line containing a GoBILDA SKU
+    const skuMatch = line.match(/\b(\d{4}-\d{4}-\d{4})\b/);
+    if (skuMatch) {
+      console.log(`🔍 FOUND SKU ${skuMatch[1]} - attempting to parse line manually`);
+      
+      // Try to extract components manually
+      const sku = skuMatch[1];
+      
+      // Find all numbers in the line
+      const allNumbers = line.match(/\d+\.?\d*/g) || [];
+      const numbers = allNumbers.map(n => parseFloat(n)).filter(n => n > 0);
+      
+      console.log(`   Numbers found: [${numbers.join(', ')}]`);
+      
+      // Try to identify quantity (small whole number, usually first)
+      let quantity = 1;
+      const smallWholeNumbers = numbers.filter(n => n >= 1 && n <= 20 && n % 1 === 0);
+      if (smallWholeNumbers.length > 0) {
+        quantity = smallWholeNumbers[0];
+      }
+      
+      // Try to identify prices (decimal numbers > 1)
+      const priceNumbers = numbers.filter(n => n >= 1.00 && n <= 1000.00);
+      let unitPrice = 0;
+      let totalPrice = 0;
+      
+      if (priceNumbers.length >= 1) {
+        if (priceNumbers.length === 1) {
+          unitPrice = priceNumbers[0];
+          totalPrice = unitPrice * quantity;
+        } else {
+          // Multiple prices - assume smaller is unit, larger is total
+          priceNumbers.sort((a, b) => a - b);
+          unitPrice = priceNumbers[0];
+          totalPrice = priceNumbers[priceNumbers.length - 1];
+        }
+      }
+      
+      if (unitPrice > 0) {
+        // Extract description by removing SKU and numbers
+        let description = line;
+        description = description.replace(sku, '').replace(/\d+\.?\d*/g, '').replace(/[\$,]/g, '');
+        description = description.replace(/\s+/g, ' ').trim();
+        
+        if (description.length >= 5) {
+          console.log(`✅ MANUAL PARSE SUCCESS:`);
+          console.log(`   SKU: ${sku}`);
+          console.log(`   Description: "${description}"`);
+          console.log(`   Quantity: ${quantity}`);
+          console.log(`   Unit Price: $${unitPrice}`);
+          console.log(`   Total Price: $${totalPrice}`);
+          
+          items.push({
+            description,
+            quantity,
+            price: unitPrice,
+            total: totalPrice,
+            sku,
+            manufacturer: 'GoBILDA',
+            confidence: 0.85
+          });
+        }
+      }
+    }
+  }
+  
+  console.log(`🎯 EMERGENCY PARSER COMPLETE: Found ${items.length} items`);
+  console.log('📋 FINAL ITEMS:');
+  items.forEach((item, index) => {
+    console.log(`Item ${index + 1}:`, item);
+  });
+  
+  return items;
+}
+
+function parseGoBILDATable(text: string): ParsedInvoiceItem[] {
+  console.log('📊 Starting GoBILDA table parsing...');
+  const items: ParsedInvoiceItem[] = [];
+  
+  // Look for the table structure: Qty | Code/SKU | Product Name | Price | Total
+  const lines = text.split('\n');
+  
+  // Find the header row that indicates table structure
+  let headerIndex = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].toLowerCase();
+    if (line.includes('qty') && line.includes('code') && line.includes('price')) {
+      headerIndex = i;
+      console.log(`📋 Found table header at line ${i + 1}: "${lines[i]}"`);
+      break;
+    }
+  }
+  
+  if (headerIndex === -1) {
+    console.log('❌ No table header found, skipping table parsing');
+    return items;
+  }
+  
+  // Parse each line after the header
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.length < 10) continue;
+    
+    // Skip summary lines (subtotal, tax, total, etc.)
+    if (isSummaryLine(line)) {
+      console.log(`⏭️ Skipping summary line: "${line.substring(0, 50)}..."`);
+      continue;
+    }
+    
+    // Try to parse as a table row
+    const item = parseTableRow(line);
+    if (item) {
+      items.push(item);
+      console.log(`📦 Table item: "${item.description}" - ${item.quantity}x $${item.price} (SKU: ${item.sku || 'N/A'})`);
+    }
+  }
+  
+  console.log(`📊 Table parsing completed, found ${items.length} items`);
+  return items;
+}
+
+function parseTableRow(line: string): ParsedInvoiceItem | null {
+  // GoBILDA table format: Qty | Code/SKU | Product Name | Price | Total
+  // We need to split by whitespace and identify each column
+  
+  // Split by multiple spaces to separate columns
+  const columns = line.split(/\s{2,}/).map(col => col.trim()).filter(col => col.length > 0);
+  
+  if (columns.length < 3) {
+    console.log(`⚠️ Insufficient columns in line: "${line}"`);
+    return null;
+  }
+  
+  console.log(`🔍 Parsing columns: [${columns.map(c => `"${c}"`).join(', ')}]`);
+  
+  let quantity = 1;
+  let sku = '';
+  let description = '';
+  let price = 0;
+  let total = 0;
+  
+  // First column is usually quantity
+  if (/^\d+$/.test(columns[0]) && parseInt(columns[0]) <= 20) {
+    quantity = parseInt(columns[0]);
+    console.log(`📊 Quantity: ${quantity}`);
+  }
+  
+  // Look for SKU pattern in any column
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i];
+    if (/^\d{4}-\d{4}-\d{4}$/.test(col) || /^\d{4}-\d{3,4}$/.test(col)) {
+      sku = col;
+      console.log(`🏷️ SKU found: ${sku}`);
+      break;
+    }
+  }
+  
+  // Look for price (usually second to last or last column)
+  for (let i = columns.length - 1; i >= 0; i--) {
+    const col = columns[i];
+    const priceMatch = col.match(/\$?(\d+\.?\d*)/);
+    if (priceMatch) {
+      price = parseFloat(priceMatch[1]);
+      console.log(`💰 Price: $${price}`);
+      break;
+    }
+  }
+  
+  // Look for total (usually last column)
+  for (let i = columns.length - 1; i >= 0; i--) {
+    const col = columns[i];
+    const totalMatch = col.match(/\$?(\d+\.?\d*)/);
+    if (totalMatch && parseFloat(totalMatch[1]) > price) {
+      total = parseFloat(totalMatch[1]);
+      console.log(`💵 Total: $${total}`);
+      break;
+    }
+  }
+  
+  // If no total found, calculate it
+  if (total === 0) {
+    total = price * quantity;
+  }
+  
+  // Description is everything else (excluding quantity, SKU, price, total)
+  const descriptionParts = columns.filter((col, index) => {
+    // Skip quantity column
+    if (index === 0 && /^\d+$/.test(col) && parseInt(col) <= 20) return false;
+    // Skip SKU column
+    if (col === sku) return false;
+    // Skip price column
+    if (col.match(/\$?(\d+\.?\d*)/) && parseFloat(col.match(/\$?(\d+\.?\d*)/)![1]) === price) return false;
+    // Skip total column
+    if (col.match(/\$?(\d+\.?\d*)/) && parseFloat(col.match(/\$?(\d+\.?\d*)/)![1]) === total) return false;
+    return true;
+  });
+  
+  description = descriptionParts.join(' ').trim();
+  
+  // Validate the extracted data
+  if (description.length < 3 || price <= 0) {
+    console.log(`❌ Invalid data: description="${description}", price=${price}`);
+    return null;
+  }
+  
+  // Clean up description
+  description = cleanDescription(description);
+  
+  return {
+    description,
+    quantity,
+    price,
+    total,
+    sku: sku || undefined,
+    manufacturer: 'GoBILDA',
+    confidence: 0.9 // High confidence for table parsing
+  };
+}
+
+function isSummaryLine(line: string): boolean {
+  const lowerLine = line.toLowerCase();
+  const summaryPatterns = [
+    'subtotal', 'tax', 'shipping', 'handling', 'discount', 'total', 'grand total',
+    'amount due', 'balance', 'payment', 'method'
+  ];
+  
+  return summaryPatterns.some(pattern => lowerLine.includes(pattern));
+}
+
+function parseGoBILDABlock(text: string): ParsedInvoiceItem[] {
+  console.log('🔍 Starting GoBILDA block parsing for single-line invoices...');
+  const items: ParsedInvoiceItem[] = [];
+  
+  // Look for price patterns in the entire text
+  const priceMatches = text.match(/\$?(\d+\.?\d*)/g);
+  if (!priceMatches) {
+    console.log('❌ No prices found in text');
+    return items;
+  }
+  
+  console.log(`💰 Found ${priceMatches.length} price matches:`, priceMatches);
+  
+  // Filter to reasonable prices (between $1 and $1000)
+  const validPrices = priceMatches
+    .map(p => parseFloat(p.replace('$', '')))
+    .filter(p => p >= 1 && p <= 1000)
+    .sort((a, b) => a - b);
+  
+  console.log(`✅ Valid prices:`, validPrices);
+  
+  if (validPrices.length === 0) {
+    console.log('❌ No valid prices found');
+    return items;
+  }
+  
+  // Split text by prices to find descriptions
+  const textParts = text.split(/\$?\d+\.?\d*/);
+  console.log(`📝 Text parts:`, textParts.map(p => p.trim()).filter(p => p.length > 0));
+  
+  // Try to match descriptions with prices
+  for (let i = 0; i < Math.min(validPrices.length, textParts.length - 1); i++) {
+    const description = textParts[i].trim();
+    const price = validPrices[i];
+    
+    if (description.length > 5 && description.length < 200) {
+      // Look for quantities in the description
+      const qtyMatch = description.match(/\b(\d{1,2})\b/);
+      const quantity = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+      
+      // Look for SKU patterns
+      const skuMatch = description.match(/[A-Z0-9-]{8,}/);
+      const sku = skuMatch ? skuMatch[0] : undefined;
+      
+      // Clean description
+      const cleanDesc = cleanDescription(description);
+      
+      if (cleanDesc.length > 3) {
+        items.push({
+          description: cleanDesc,
+          quantity,
+          price,
+          total: price * quantity,
+          sku,
+          manufacturer: 'GoBILDA',
+          confidence: 0.5 // Medium confidence for block parsing
+        });
+        
+        console.log(`📦 Block item: "${cleanDesc}" - ${quantity}x $${price} (SKU: ${sku || 'N/A'})`);
+      }
+    }
+  }
+  
+  // If we still don't have items, try a more aggressive approach
+  if (items.length === 0) {
+    console.log('🔄 Block parsing failed, trying aggressive price-based parsing...');
+    return parseGoBILDAAggressive(text, validPrices);
+  }
+  
+  return items;
+}
+
+function parseGoBILDAAggressive(text: string, prices: number[]): ParsedInvoiceItem[] {
+  console.log('🔍 Starting aggressive GoBILDA parsing...');
+  const items: ParsedInvoiceItem[] = [];
+  
+  // Split text by common delimiters and look for product-like segments
+  const segments = text.split(/[,;|]/).map(s => s.trim()).filter(s => s.length > 10);
+  console.log(`📝 Text segments:`, segments);
+  
+  for (let i = 0; i < Math.min(prices.length, segments.length); i++) {
+    const segment = segments[i];
+    const price = prices[i];
+    
+    // Look for numbers that could be quantities
+    const qtyMatches = segment.match(/\b(\d{1,2})\b/g);
+    const quantity = qtyMatches && qtyMatches.length > 0 ? parseInt(qtyMatches[0]) : 1;
+    
+    // Clean description by removing numbers and special chars
+    const description = segment
+      .replace(/\d+/g, ' ')
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 100);
+    
+    if (description.length > 5) {
+      items.push({
+        description,
+        quantity,
+        price,
+        total: price * quantity,
+        manufacturer: 'GoBILDA',
+        confidence: 0.3 // Low confidence for aggressive parsing
+      });
+      
+      console.log(`📦 Aggressive item: "${description}" - ${quantity}x $${price}`);
+    }
+  }
+  
+  return items;
 }
 
 function cleanDescription(desc: string): string {

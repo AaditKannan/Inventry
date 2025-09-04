@@ -53,6 +53,8 @@ export default function TeamsPage() {
     region: '',
     visibility: 'public' as 'public' | 'private'
   });
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   
   const supabase = createClient();
 
@@ -153,16 +155,82 @@ export default function TeamsPage() {
     }
   };
 
-  const handleSaveEdit = () => {
-    if (team) {
-      setTeam({
-        ...team,
-        name: editForm.name,
-        city: editForm.city || null,
-        region: editForm.region || null,
-        visibility: editForm.visibility
+  const handleSaveEdit = async () => {
+    if (!team) return;
+    
+    try {
+      console.log('Saving team changes:', editForm);
+      
+      const { data: updatedTeam, error } = await supabase
+        .from('teams')
+        .update({
+          name: editForm.name,
+          city: editForm.city || null,
+          region: editForm.region || null,
+          visibility: editForm.visibility
+        })
+        .eq('id', team.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating team:', error);
+        alert('Failed to save team changes. Please try again.');
+        return;
+      }
+
+      if (updatedTeam) {
+        setTeam(updatedTeam);
+        setIsEditing(false);
+        console.log('Team updated successfully:', updatedTeam);
+        alert('Team changes saved successfully!');
+      }
+    } catch (error) {
+      console.error('Error saving team:', error);
+      alert('Failed to save team changes. Please try again.');
+    }
+  };
+
+  const generateInviteLink = async () => {
+    if (!team) return;
+    
+    try {
+      // Generate a unique invite code
+      const inviteCode = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      
+      console.log('Generating invite for team:', team.id);
+      
+      // Create the invite link
+      const baseUrl = window.location.origin;
+      const inviteUrl = `${baseUrl}/join/${inviteCode}`;
+      
+      // Store the invite in localStorage for now (in production, this would be in the database)
+      const invites = JSON.parse(localStorage.getItem('teamInvites') || '{}');
+      invites[inviteCode] = {
+        teamId: team.id,
+        teamName: team.name,
+        createdAt: new Date().toISOString(),
+        createdBy: 'current-user' // In production, get from auth
+      };
+      localStorage.setItem('teamInvites', JSON.stringify(invites));
+      
+      setInviteLink(inviteUrl);
+      setShowInviteModal(true);
+      
+      console.log('Invite generated:', inviteUrl);
+    } catch (error) {
+      console.error('Error generating invite:', error);
+      alert('Failed to generate invite link. Please try again.');
+    }
+  };
+
+  const copyInviteLink = () => {
+    if (inviteLink) {
+      navigator.clipboard.writeText(inviteLink).then(() => {
+        alert('Invite link copied to clipboard!');
+      }).catch(() => {
+        alert('Failed to copy link. Please copy manually.');
       });
-      setIsEditing(false);
     }
   };
 
@@ -377,6 +445,7 @@ export default function TeamsPage() {
                 <CardTitle className="text-white text-xl">Team Members ({members.length})</CardTitle>
                 <Button
                   size="sm"
+                  onClick={generateInviteLink}
                   className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -419,6 +488,55 @@ export default function TeamsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Invite Modal */}
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-slate-900/95 backdrop-blur-xl border border-white/20 rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white">Team Invitation</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowInviteModal(false)}
+                  className="text-blue-300 hover:text-white hover:bg-white/10"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <p className="text-blue-200 mb-4">
+                Share this link with people you want to invite to your team:
+              </p>
+              
+              <div className="bg-slate-800/50 border border-white/20 rounded-lg p-3 mb-4">
+                <p className="text-white text-sm break-all font-mono">
+                  {inviteLink}
+                </p>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={copyInviteLink}
+                  className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 flex-1"
+                >
+                  Copy Link
+                </Button>
+                <Button
+                  onClick={() => setShowInviteModal(false)}
+                  variant="outline"
+                  className="bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400"
+                >
+                  Close
+                </Button>
+              </div>
+              
+              <p className="text-blue-300 text-xs mt-3 text-center">
+                This link will allow others to join your team directly
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

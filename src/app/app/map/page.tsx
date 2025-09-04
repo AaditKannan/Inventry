@@ -17,6 +17,7 @@ import {
   Users,
   MapIcon
 } from 'lucide-react';
+import StarryBackground from '@/components/ui/starry-background';
 
 interface Team {
   id: string;
@@ -83,34 +84,20 @@ export default function MapPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
-        <div className="max-w-6xl mx-auto relative z-10">
+      <StarryBackground className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
             <p className="text-blue-200 mt-4">Loading map...</p>
           </div>
         </div>
-      </div>
+      </StarryBackground>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 1px, transparent 1px),
-                           radial-gradient(circle at 75% 75%, #3b82f6 1px, transparent 1px)`,
-          backgroundSize: '100px 100px, 150px 150px'
-        }} />
-      </div>
-
-      {/* Floating elements */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-500/10 rounded-lg rotate-45 animate-float" />
-        <div className="absolute bottom-20 right-20 w-24 h-24 bg-blue-600/5 rounded-full animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-10 w-20 h-20 border border-blue-400/8 rounded-full animate-float" style={{ animationDelay: '4s' }} />
-      </div>
+    <StarryBackground className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6"
+      starCount={25}>
 
       <div className="max-w-7xl mx-auto relative z-10">
         {/* Header */}
@@ -238,6 +225,6 @@ export default function MapPage() {
           </Card>
         )}
       </div>
-    </div>
+    </StarryBackground>
   );
 }

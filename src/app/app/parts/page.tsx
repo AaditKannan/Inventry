@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Database, Search, Filter, Package, ExternalLink, Plus, Eye, ShoppingCart } from 'lucide-react';
@@ -322,19 +323,20 @@ export default function PartsPage() {
           </p>
         </div>
 
-        {/* Parts Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Parts Grid - Compact 4-column layout */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredParts.map((part) => (
             <Card 
               key={part.id} 
-              className="bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl hover:border-blue-400/30 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-500 group cursor-pointer h-full flex flex-col"
+              className="bg-white/5 backdrop-blur-xl border-white/20 shadow-lg hover:border-blue-400/30 hover:shadow-xl hover:shadow-blue-500/20 transition-all duration-300 group cursor-pointer h-full flex flex-col"
               onClick={() => openPartDetails(part)}
             >
-              <CardHeader className="pb-3 flex-shrink-0">
-                <div className="flex justify-between items-start mb-2">
+              <CardContent className="p-4 flex flex-col h-full">
+                {/* Header with brand */}
+                <div className="flex justify-between items-start mb-3">
                   <Badge 
                     variant="outline" 
-                    className={`border ${
+                    className={`text-xs ${
                       part.manufacturer === 'GoBILDA' 
                         ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30'
                         : part.manufacturer === 'REV'
@@ -344,121 +346,77 @@ export default function PartsPage() {
                   >
                     {part.manufacturer}
                   </Badge>
-                  <Badge variant="outline" className="bg-slate-600/20 text-slate-300 border-slate-500/30">
-                    {part.series}
-                  </Badge>
+                  <span className="text-blue-300 text-xs">{part.variants.length} variants</span>
                 </div>
-                <CardTitle className="text-white text-lg group-hover:text-blue-300 transition-colors min-h-[3.5rem] flex items-center">
+
+                {/* Part name - prominent */}
+                <h3 className="text-white font-semibold text-sm mb-2 line-clamp-2 min-h-[2.5rem] group-hover:text-blue-300 transition-colors">
                   {part.name}
-                </CardTitle>
-                <CardDescription className="text-blue-200 text-sm">
-                  {part.variants.length} variants available
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col justify-between space-y-4">
-                <div className="space-y-4">
-                  <p className="text-blue-100 text-sm min-h-[2.5rem] line-clamp-2">{part.description}</p>
-                  
-                  {/* Price Range */}
+                </h3>
+
+                {/* Key info: SKU and Price - most prominent */}
+                <div className="space-y-2 mb-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-blue-300 text-sm">Price:</span>
-                    <span className="text-white font-medium">
+                    <span className="text-blue-300 text-xs font-medium">SKU:</span>
+                    <span className="text-white text-xs font-mono">{part.variants[0].sku}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-blue-300 text-xs font-medium">Price:</span>
+                    <span className="text-white font-semibold text-sm">
                       ${Math.min(...part.variants.map(v => v.price))}
-                      {Math.min(...part.variants.map(v => v.price)) !== Math.max(...part.variants.map(v => v.price)) 
-                        ? ` - $${Math.max(...part.variants.map(v => v.price))}` 
-                        : ''}
+                      {Math.min(...part.variants.map(v => v.price)) !== Math.max(...part.variants.map(v => v.price)) && '+'}
                     </span>
                   </div>
-
-                  {/* Available Options Preview - Standardized */}
-                  <div className="min-h-[3rem] space-y-1">
-                    {part.specification_options.rpms && (
-                      <div className="flex justify-between">
-                        <span className="text-blue-300 text-xs">RPM Options:</span>
-                        <span className="text-white text-xs">{part.specification_options.rpms.length}</span>
-                      </div>
-                    )}
-                    {part.specification_options.shaft_lengths && (
-                      <div className="flex justify-between">
-                        <span className="text-blue-300 text-xs">Lengths:</span>
-                        <span className="text-white text-xs">{part.specification_options.shaft_lengths.length}</span>
-                      </div>
-                    )}
-                    {part.specification_options.gear_ratios && (
-                      <div className="flex justify-between">
-                        <span className="text-blue-300 text-xs">Ratios:</span>
-                        <span className="text-white text-xs">{part.specification_options.gear_ratios.length}</span>
-                      </div>
-                    )}
-                    {!part.specification_options.rpms && !part.specification_options.shaft_lengths && !part.specification_options.gear_ratios && (
-                      <div className="flex justify-between">
-                        <span className="text-blue-300 text-xs">Type:</span>
-                        <span className="text-white text-xs">Standard</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
 
-                {/* Buttons - Always at bottom */}
-                <div className="flex gap-2 pt-2 mt-auto">
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30 hover:border-blue-400 hover:text-white transition-all duration-300"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openPartDetails(part);
-                    }}
-                  >
-                    <Package className="w-4 h-4 mr-1" />
-                    Configure
-                  </Button>
-                  {part.datasheet_url && (
-                    <Button 
-                      variant="outline"
-                      size="sm"
-                      className="bg-slate-600/20 border-slate-500/30 text-slate-300 hover:bg-slate-600/30 hover:border-slate-400 hover:text-white transition-all duration-300"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(part.datasheet_url, '_blank');
-                      }}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+                {/* Quick specs preview */}
+                <div className="flex-1">
+                  {part.specification_options.rpms && (
+                    <div className="text-xs text-blue-200 mb-1">
+                      <span className="text-blue-300">RPM:</span> {part.specification_options.rpms.length} options
+                    </div>
+                  )}
+                  {part.specification_options.gear_ratios && (
+                    <div className="text-xs text-blue-200 mb-1">
+                      <span className="text-blue-300">Ratios:</span> {part.specification_options.gear_ratios.length} options
+                    </div>
                   )}
                 </div>
+
+                {/* Action button */}
+                <Button 
+                  size="sm"
+                  className="w-full mt-3 bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 hover:border-blue-400 hover:text-white transition-all duration-300"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPartDetails(part);
+                  }}
+                >
+                  <Eye className="w-3 h-3 mr-2" />
+                  View Details
+                </Button>
               </CardContent>
             </Card>
           ))}
         </div>
 
         {/* Part Details Modal */}
-        {selectedPart && selectedVariant && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-3xl bg-slate-900/95 backdrop-blur-xl border-white/20 shadow-2xl max-h-[90vh] overflow-y-auto">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-white text-xl">{selectedPart.name}</CardTitle>
-                    <CardDescription className="text-blue-200">
-                      {selectedVariant.sku} • {selectedPart.manufacturer} {selectedPart.series}
-                    </CardDescription>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={closePartDetails}
-                    className="text-blue-200 hover:text-white hover:bg-white/10"
-                  >
-                    ✕
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <h4 className="text-blue-300 font-medium mb-2">Description</h4>
-                  <p className="text-blue-100">{selectedPart.description}</p>
-                </div>
+        <Dialog open={!!selectedPart} onOpenChange={(open) => !open && closePartDetails()}>
+          <DialogContent className="max-w-4xl bg-slate-900/95 backdrop-blur-xl border-white/20 shadow-2xl text-white">
+            <DialogHeader>
+              <DialogTitle className="text-white text-xl">
+                {selectedPart?.name}
+              </DialogTitle>
+              <div className="text-blue-200">
+                {selectedVariant?.sku} • {selectedPart?.manufacturer} {selectedPart?.series}
+              </div>
+            </DialogHeader>
+            
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto">
+              <div>
+                <h4 className="text-blue-300 font-medium mb-2">Description</h4>
+                <p className="text-blue-100">{selectedPart?.description}</p>
+              </div>
 
                 {/* Specification Selectors */}
                 <div className="space-y-4">

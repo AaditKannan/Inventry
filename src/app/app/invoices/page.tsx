@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Upload, FileText, CheckCircle, AlertCircle, Clock, Trash2, Eye, Download, Zap, Package, TrendingUp } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import parseInvoiceText, { ParsedInvoice, ParsedInvoiceItem, generateInventorySuggestions } from '@/lib/invoice-parser';
+import StarryBackground from '@/components/ui/starry-background';
 
 interface Invoice {
   id: string;
@@ -46,7 +47,7 @@ export default function InvoicesPage() {
     onDrop,
     accept: {
       'application/pdf': ['.pdf'],
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif']
+      'text/plain': ['.txt']
     },
     multiple: false
   });
@@ -56,69 +57,135 @@ export default function InvoicesPage() {
     console.log('🤖 Starting AI processing for:', file.name);
 
     try {
-      // Extract text from file (simulated for demo)
+      // Validate file size (max 10MB for PDFs)
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('File too large. Please upload a PDF smaller than 10MB.');
+      }
+      
+      // Extract text from file
+      console.log('📄 Extracting text from PDF...');
       const text = await extractTextFromFile(file);
+      console.log('✅ Extracted text length:', text.length);
+      
+      if (text.trim().length < 50) {
+        throw new Error('PDF appears to be empty or contains very little text. Please ensure your PDF contains readable text.');
+      }
       
       // Parse with AI
+      console.log('🤖 Parsing invoice with AI...');
+      console.log('📄 Raw extracted text (first 1000 chars):', text.substring(0, 1000));
+      console.log('📄 Raw extracted text (last 1000 chars):', text.substring(Math.max(0, text.length - 1000)));
+      
       const parsed = parseInvoiceText(text);
       console.log('✅ AI parsing complete:', parsed);
+      
+      if (parsed.items.length === 0) {
+        console.error('❌ No items found. Raw text analysis:');
+        console.error('Text length:', text.length);
+        console.error('Lines count:', text.split('\n').length);
+        console.error('Sample lines:', text.split('\n').slice(0, 10));
+        throw new Error(`No items found in the invoice. The PDF text was extracted (${text.length} characters, ${text.split('\n').length} lines) but the AI parser couldn't identify line items. This might be due to the text format or structure.`);
+      }
       
       setParsedInvoice(parsed);
       setShowParsingResults(true);
       
     } catch (error) {
       console.error('❌ AI processing failed:', error);
+      alert(`Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    console.log('📄 Extracting text from:', file.name, 'Type:', file.type);
+    console.log('🔍 PROFESSIONAL OCR EXTRACTION for:', file.name, 'Type:', file.type);
     
     try {
       if (file.type === 'application/pdf') {
-        // Extract text from PDF using PDF.js
-        const pdfjsLib = await import('pdfjs-dist');
-        // Set the worker path
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+        // Use Tesseract.js OCR for maximum accuracy
+        console.log('📊 Starting professional OCR processing...');
+        const Tesseract = await import('tesseract.js');
         
+        // Convert PDF to high-resolution images for OCR
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/workers/pdf.worker.min.js';
         const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
         
         let fullText = '';
+        console.log(`📄 Processing ${pdf.numPages} pages with professional OCR...`);
+        
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-          const page = await pdf.getPage(pageNum);
-          const textContent = await page.getTextContent();
-          const textItems = textContent.items.map((item: any) => item.str);
-          fullText += textItems.join(' ') + '\n';
+          try {
+            const page = await pdf.getPage(pageNum);
+            // Use high scale for maximum OCR accuracy
+            const viewport = page.getViewport({ scale: 3.0 });
+            
+            // Create high-resolution canvas
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d')!;
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            // Render PDF page to canvas with high quality
+            const renderContext = {
+              canvasContext: context,
+              viewport: viewport
+            };
+            await page.render(renderContext).promise;
+            
+            console.log(`🔍 OCR processing page ${pageNum} (${canvas.width}x${canvas.height})...`);
+            
+            // Use Tesseract.js with optimized settings for invoices
+            const result = await Tesseract.recognize(canvas, 'eng', {
+              logger: m => {
+                if (m.status === 'recognizing text') {
+                  console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+                }
+              },
+              tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
+              tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-.,()/$# ',
+              preserve_interword_spaces: '1'
+            });
+            
+            const pageText = result.data.text;
+            fullText += pageText + '\n\n';
+            
+            console.log(`✅ Page ${pageNum} OCR complete:`);
+            console.log(`   Text length: ${pageText.length} characters`);
+            console.log(`   Confidence: ${result.data.confidence}%`);
+            console.log(`   Preview: "${pageText.substring(0, 200)}..."`);
+            
+          } catch (pageError) {
+            console.error(`❌ Error processing page ${pageNum}:`, pageError);
+            throw new Error(`OCR failed on page ${pageNum}: ${pageError instanceof Error ? pageError.message : 'Unknown error'}`);
+          }
         }
         
-        console.log('✅ PDF text extracted, length:', fullText.length);
+        console.log('🎯 PROFESSIONAL OCR COMPLETE:');
+        console.log(`   Total text length: ${fullText.length} characters`);
+        console.log(`   Total lines: ${fullText.split('\n').length}`);
+        console.log(`   Preview (first 1000 chars):\n${fullText.substring(0, 1000)}`);
+        console.log(`   Preview (last 1000 chars):\n${fullText.substring(Math.max(0, fullText.length - 1000))}`);
+        
+        if (fullText.trim().length === 0) {
+          throw new Error('OCR failed to extract any readable text from this PDF.');
+        }
+        
         return fullText;
-      } else if (file.type.startsWith('image/')) {
-        // Extract text from image using enhanced OCR
-        const Tesseract = await import('tesseract.js');
-        console.log('🔍 Starting enhanced OCR processing...');
         
-        // Enhanced OCR options for better accuracy
-        const { data: { text } } = await Tesseract.recognize(file, 'eng', {
-          logger: m => {
-            if (m.status === 'recognizing text') {
-              console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
-            }
-          }
-        });
-        
-        console.log('✅ Enhanced OCR text extracted, length:', text.length);
-        console.log('📄 OCR Text Preview:', text.substring(0, 500));
+      } else if (file.type === 'text/plain') {
+        const text = await file.text();
+        console.log('✅ Text file loaded, length:', text.length);
         return text;
       } else {
-        throw new Error('Unsupported file type. Please upload a PDF or image file.');
+        throw new Error('Only PDF files are supported for invoice processing.');
       }
     } catch (error) {
-      console.error('❌ Text extraction failed:', error);
-      throw new Error(`Failed to extract text from ${file.type} file: ${error}`);
+      console.error('❌ PROFESSIONAL OCR FAILED:', error);
+      throw new Error(`Professional OCR extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -287,7 +354,8 @@ export default function InvoicesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">{/* Clean background, no weird patterns */}
+    <StarryBackground className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6"
+      starCount={25}>
 
       <div className="max-w-6xl mx-auto relative z-10">
         {/* Header */}
@@ -300,9 +368,9 @@ export default function InvoicesPage() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-300 to-blue-100 bg-clip-text text-transparent mb-2">
             Invoice Processing
           </h1>
-          <p className="text-blue-200 text-lg">
-            Upload invoices and let AI extract parts automatically
-          </p>
+                     <p className="text-blue-200 text-lg">
+             Upload invoices and let professional OCR + AI extract parts with surgical precision
+           </p>
         </div>
 
         {/* Upload Section */}
@@ -330,9 +398,9 @@ export default function InvoicesPage() {
               <p className="text-white text-lg mb-2">
                 {isDragActive ? 'Drop your invoice here' : 'Drag & drop your invoice here'}
               </p>
-              <p className="text-blue-200 text-sm mb-4">
-                Supports PDF, images, and documents
-              </p>
+                             <p className="text-blue-200 text-sm mb-4">
+                 PDF invoices supported • Professional OCR + AI parsing
+               </p>
               <Button variant="outline" className="bg-white/10 border-white/20 text-blue-200 hover:bg-white/20 hover:border-blue-400">
                 Browse Files
               </Button>
@@ -386,6 +454,29 @@ export default function InvoicesPage() {
           </CardContent>
         </Card>
 
+        {/* Helpful Tips */}
+        {!selectedFile && !isProcessing && !showParsingResults && (
+          <Card className="mb-8 bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="p-2 bg-blue-500/20 rounded-lg">
+                  <Package className="h-5 w-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold mb-2">💡 PDF Processing Tips</h3>
+                  <ul className="text-blue-200 text-sm space-y-2">
+                    <li>• <strong>Upload PDF invoices</strong> directly for automatic text extraction</li>
+                    <li>• Works best with text-based PDFs (not scanned images)</li>
+                    <li>• AI automatically finds part numbers, quantities, and prices</li>
+                    <li>• GoBILDA and REV parts are matched to our comprehensive library</li>
+                    <li>• <strong>Multi-page invoices</strong> are fully supported!</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Processing Status */}
         {isProcessing && (
           <Card className="mb-8 bg-white/5 backdrop-blur-xl border-white/20 shadow-2xl">
@@ -394,9 +485,9 @@ export default function InvoicesPage() {
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
                 <div>
                   <h3 className="text-white font-semibold">Processing File...</h3>
-                  <p className="text-blue-200 text-sm">
-                    {selectedFile?.type === 'application/pdf' ? 'Extracting text from PDF' : 'Running OCR on image'}
-                  </p>
+                                     <p className="text-blue-200 text-sm">
+                     {selectedFile?.type === 'application/pdf' ? 'Professional OCR extraction in progress...' : 'Processing file with AI...'}
+                   </p>
                 </div>
               </div>
             </CardContent>
@@ -604,6 +695,6 @@ export default function InvoicesPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </StarryBackground>
   );
 }

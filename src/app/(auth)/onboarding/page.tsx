@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { Building2, MapPin, Users, Eye, EyeOff } from 'lucide-react';
+import StarryBackground from '@/components/ui/starry-background';
 
 interface Team {
   id: string;
@@ -145,6 +146,19 @@ export default function OnboardingPage() {
         return;
       }
 
+      // Check if team name already exists
+      const { data: existingTeam, error: checkError } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('name', teamName.trim())
+        .maybeSingle();
+
+      if (existingTeam) {
+        alert(`Team name "${teamName}" already exists. Please choose a different name.`);
+        setIsSubmitting(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/login');
@@ -152,7 +166,15 @@ export default function OnboardingPage() {
       }
 
       // Create the team
-      const { data: team, error: teamError } = await supabase
+      console.log('Creating team with data:', {
+        name: teamName,
+        city: city || null,
+        region: region || null,
+        visibility,
+        created_by: user.id
+      });
+
+      const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .insert({
           name: teamName,
@@ -162,11 +184,20 @@ export default function OnboardingPage() {
           created_by: user.id
         })
         .select()
-        .single();
+        .maybeSingle();
+
+      console.log('Team creation result:', { teamData, teamError });
 
       if (teamError) {
+        console.error('Team creation error:', teamError);
         throw teamError;
       }
+
+      if (!teamData) {
+        throw new Error('Team was not created - no data returned');
+      }
+
+      const team = teamData;
 
       // Update user profile with team_id
       console.log('Updating profile with:', { team_id: team.id, display_name: displayName || teamName, user_id: user.id });
@@ -205,7 +236,18 @@ export default function OnboardingPage() {
       window.location.href = '/app';
     } catch (error) {
       console.error('Error creating team:', error);
-      alert('Failed to create team. Please try again.');
+      
+      // Check for specific error types
+      if (error && typeof error === 'object' && 'code' in error) {
+        const dbError = error as any;
+        if (dbError.code === '23505') {
+          alert(`Team name "${teamName}" already exists. Please choose a different name.`);
+        } else {
+          alert(`Failed to create team: ${dbError.message || 'Unknown database error'}`);
+        }
+      } else {
+        alert(`Failed to create team: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -281,22 +323,8 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 relative overflow-hidden">
-      {/* Subtle background pattern - static, no performance impact - same as home page */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 1px, transparent 1px),
-                           radial-gradient(circle at 75% 75%, #3b82f6 1px, transparent 1px)`,
-          backgroundSize: '100px 100px, 150px 150px'
-        }} />
-      </div>
-
-      {/* Subtle floating elements - minimal animation - same as home page */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-20 left-20 w-32 h-32 border border-blue-500/10 rounded-lg rotate-45 animate-float" />
-        <div className="absolute bottom-20 right-20 w-24 h-24 bg-blue-600/5 rounded-full animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-10 w-20 h-20 border border-blue-400/8 rounded-full animate-float" style={{ animationDelay: '4s' }} />
-      </div>
+    <StarryBackground className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4"
+      starCount={25}>
 
       <div className="max-w-4xl mx-auto relative z-10">
         {/* Header */}
@@ -578,6 +606,6 @@ export default function OnboardingPage() {
           </Card>
         )}
       </div>
-    </div>
+    </StarryBackground>
   );
 }

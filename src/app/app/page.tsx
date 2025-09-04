@@ -193,10 +193,10 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 p-6 relative overflow-hidden">
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
             <p className="text-blue-200 mt-4">Loading dashboard...</p>
           </div>
         </div>
@@ -205,31 +205,17 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 relative overflow-hidden">
-      {/* Background pattern */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 p-6 relative overflow-hidden">
+      {/* Background pattern - subtle grid */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0" style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, #3b82f6 1px, transparent 1px),
-                           radial-gradient(circle at 75% 75%, #3b82f6 1px, transparent 1px)`,
-          backgroundSize: '100px 100px, 150px 150px'
+          backgroundImage: `radial-gradient(circle at 25% 25%, #1e3a8a 1px, transparent 1px),
+                           radial-gradient(circle at 75% 75%, #1e3a8a 1px, transparent 1px)`,
+          backgroundSize: '120px 120px, 180px 180px'
         }} />
       </div>
 
-      {/* Twinkling stars - the cool animated dots */}
-      <div className="absolute inset-0">
-        {[...Array(25)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-2 h-2 bg-blue-300 rounded-full opacity-80 animate-twinkle"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
-            }}
-          />
-        ))}
-      </div>
+
 
       {/* Floating geometric shapes */}
       <div className="absolute inset-0 pointer-events-none">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import StarField from "@/components/ui/StarField";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,7 +17,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <div className="relative">
+          {/* Beautiful twinkling stars on every page */}
+          <StarField />
+          {children}
+        </div>
+      </body>
     </html>
   );
 }
